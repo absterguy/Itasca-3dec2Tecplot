@@ -1,0 +1,431 @@
+;*********************************************************
+; -*- coding: UTF-8 -*-
+; File Name:3dec2tecplot360.3ddat
+; Author:Shine
+; Email:shenhui19@mails.ucas.ac.cn
+; Website:geomatlab.com
+; Version:v1.0
+; Date:2021/6/23
+; Description:This FISH script is used to output the node 
+;            coordinates(X,Y,Z), displacement(xdis,ydisp,zdisp,magdisp), 
+;            velocity(xvel,yvel,zvel,magvel) and element stress
+;            (SXX,SYY,SZZ,SXY,SXZ,SYZ,Sig1,Sig2,Sig3,Mises) 
+;            of 3DEC5.2 model into the input format of 
+;            Tecplot360 2017 or higher version.
+;           (The script successfully passed the test at Tecplot360 2017)
+; Function List:
+;        get function:
+;            @get_zonenum:  Get the total number of zones
+;            @get_gpnum:    Get the total number of gp
+;            @get_gp_info:  Get nodal pointer, number, coordinates,  
+;                           displacement and velocity
+;            @get_Stress:   Get element stress
+;            @get_gp_disp:  Get the displacement magnitude at each node
+;            @get_gp_vel:   Get the velocity magnitude at each node
+;		print function:
+;            @write_gp_info:       Output gp-related data,such as Coordinates,  
+;                                  Displacements and Velocities
+;            @write_zone_info:     Output zone-related data,such as Stresses
+;            @write_zone_connect:  Output the node connection information
+;            @write_head:          Output the head of file
+;		ini function:
+;            @ini_fileout:Initialize information of the output file
+;		main fucntion:
+;            @main:The main function used to control the output  
+;                  of all printed information
+; Usage: When the model calculation is completed, call this script to 
+;        output the model information to Tecplot360 for post-processing.
+;        use command:call your_path/3DEC520_Tecplot.dat       
+;         __    _          
+;   _____/ /_  (_)___  ___ 
+;  / ___/ __ \/ / __ \/ _ \
+; (__  ) / / / / / / /  __/
+;/____/_/ /_/_/_/ /_/\___/ 
+;                                   _   _       _                         
+;                                  | | | |     | |                        
+;   __ _  ___  ___  _ __ ___   __ _| |_| | __ _| |__   ___ ___  _ __ ___  
+;  / _` |/ _ \/ _ \| '_ ` _ \ / _` | __| |/ _` | '_ \ / __/ _ \| '_ ` _ \ 
+; | (_| |  __/ (_) | | | | | | (_| | |_| | (_| | |_) | (_| (_) | | | | | |
+;  \__, |\___|\___/|_| |_| |_|\__,_|\__|_|\__,_|_.__(_)___\___/|_| |_| |_|
+;   __/ |                                                                 
+;  |___/                                                                  
+;
+;*********************************************************
+
+def ini_fileout
+    IO_READ  = 0
+    IO_WRITE = 1
+    IO_FISH  = 0
+    IO_ASCII = 1
+    N_RECORD=10
+	;Set unit scaling factor
+    disp_Scaler= 1    ;eg. unit m/mm
+    stress_Scaler = 1 ;eg. unit Pa/MPa
+    array buf(10)
+    tec_file = '3DEC520_Tecplot.dat'
+    head_title = 'Model_1'
+end
+@ini_fileout
+;;
+define get_zonenum  
+    bi=block_head
+    zonenum=0  ;zone number count    
+    bnum=0     ;block number count    
+    loop while bi # 0
+      zi=b_zone(bi)
+      loop while zi # 0
+        zi=z_next(zi)
+        zonenum=zonenum+1
+      endloop
+    bi=b_next(bi)
+    bnum=bnum+1
+    endloop
+    oo=out("Total zone: "+string(zonenum))
+    oo=out("Total block: "+string(bnum))
+end
+@get_zonenum 
+
+define get_gpnum
+    bi=block_head
+    gpnum=0  ;gp number count
+    loop while bi # 0
+      p_gp=b_gp(bi)
+        loop while p_gp # 0
+          p_gp=gp_next(p_gp)
+          gpnum=gpnum+1
+        endloop
+      bi=b_next(bi)
+    endloop
+    oo=out("Total gp: "+string(gpnum))
+end
+@get_gpnum
+
+define get_gp_info
+  ;The array is used to store node address and number
+  array GP_INDEX(gpnum,3)  
+  
+  ;The array is used to store the start number and 
+  ;end number of gp in a block
+  array GP_BEG_END(bnum,3) 
+  
+  ;The three arrays below is used to store gp information
+  ;like coordinate,displacement and velocity
+  array GP_COOR_(gpnum,3)
+  array GP_DISP_(gpnum,3)
+  array GP_VEL_(gpnum,3)
+  bi=block_head
+  ii=1 
+  n_block=0
+  GP_BEG_END(1,1)=1   ;Node number in the first block(begin)
+  GP_BEG_END(1,2)=1   ;Node number in the first block(end)
+  loop while bi # 0
+    n_block=n_block+1
+    if n_block >1  then
+        GP_BEG_END(n_block,1)=GP_BEG_END(n_block-1,2)+1
+    endif
+    gp_count=0
+    p_gp=b_gp(bi)
+    loop while p_gp # 0
+        GP_INDEX(ii,1)=p_gp         ;The first column is used to store the node pointer
+        GP_INDEX(ii,2)=ii           ;The second column is used to store the node number
+        GP_INDEX(ii,3)=bi           ;The third column is used to store the block pointer
+	    GP_COOR_(ii,1)=gp_x(p_gp)
+	    GP_COOR_(ii,2)=gp_y(p_gp)
+	    GP_COOR_(ii,3)=gp_z(p_gp)
+	    GP_DISP_(ii,1)=gp_xdis(p_gp)
+	    GP_DISP_(ii,2)=gp_ydis(p_gp)
+	    GP_DISP_(ii,3)=gp_zdis(p_gp)
+	    GP_VEL_(ii,1)=gp_xvel(p_gp)
+	    GP_VEL_(ii,2)=gp_yvel(p_gp)
+	    GP_VEL_(ii,3)=gp_zvel(p_gp)
+        p_gp=gp_next(p_gp)
+        ii=ii+1                
+        gp_count=gp_count+1 
+    endloop
+    GP_BEG_END(n_block,2)=GP_BEG_END(n_block,1)+gp_count-1
+    bi=b_next(bi)
+  endloop
+  ii=ii-1 
+end
+@get_gp_info
+
+def get_Stress
+    ;The array is used to store zone node number in order
+    array Z_GP_INDEX(zonenum,4)
+	
+	;The array is used to store zone stress component
+	;including sxx,syy,szz,sxy,sxz,syz,sig1,sig2,sig3,Mises
+	;you can change the size of this array and add 
+	;more stress component
+    array ZONE_STRESS(zonenum,10)
+    znum=0
+    n_block=0
+    bi=block_head
+    loop while bi # 0
+        n_block=n_block+1
+	    zi=b_zone(bi)
+	    loop while zi # 0
+            gp_beg=GP_BEG_END(n_block,1) 
+            gp_end=GP_BEG_END(n_block,2)
+            znum=znum+1
+            el_sxx=z_sxx(zi)
+            el_syy=z_syy(zi)
+            el_szz=z_szz(zi)
+            el_sxy=z_sxy(zi)
+            el_sxz=z_sxz(zi)
+            el_syz=z_syz(zi)
+            el_sig_1=z_sig1(zi)
+            el_sig_2=z_sig2(zi)
+            el_sig_3=z_sig3(zi)
+            VonMises=(el_sig_1-el_sig_2)^2+(el_sig_2-el_sig_3)^2
+            VonMises=VonMises+(el_sig_1-el_sig_3)^2
+            el_Mises = sqrt(VonMises/2.0)
+            loop i (1,4)
+                zgpi=z_gp(zi,i)
+                loop j (gp_beg,gp_end)  			
+                    if GP_INDEX(j,1)=zgpi
+                    ;get zone gp number
+                    Z_GP_INDEX(znum,i)=GP_INDEX(j,2)  	
+                    endif
+                endloop
+            endloop
+            ZONE_STRESS(znum,1)=el_sxx
+            ZONE_STRESS(znum,2)=el_syy
+            ZONE_STRESS(znum,3)=el_szz
+            ZONE_STRESS(znum,4)=el_sxy
+            ZONE_STRESS(znum,5)=el_sxz
+            ZONE_STRESS(znum,6)=el_syz
+            ZONE_STRESS(znum,7)=el_sig_1
+            ZONE_STRESS(znum,8)=el_sig_2
+            ZONE_STRESS(znum,9)=el_sig_3
+            ZONE_STRESS(znum,10)=el_Mises
+            zi=z_next(zi)
+        endloop	
+        bi=b_next(bi)  	
+    endloop
+
+end
+@get_Stress 
+
+;Calculate displacement magnitude
+def get_gp_disp
+    gp_disp = (GP_DISP_(gpCount,1))^2
+    gp_disp = gp_disp + (GP_DISP_(gpCount,2))^2
+    gp_disp = gp_disp + (GP_DISP_(gpCount,3))^2
+    gp_disp = sqrt(gp_disp)    
+end
+
+;Calculate velocity magnitude
+def get_gp_vel
+    gp_velocity = (GP_VEL_(gpCount,1))^2
+    gp_velocity = gp_velocity + (GP_VEL_(gpCount,2))^2
+    gp_velocity = gp_velocity + (GP_VEL_(gpCount,3))^2
+    gp_velocity = sqrt(gp_velocity)    
+end
+
+;Write gp-related data,such as Coordinates, Displacements 
+;and Velocities
+def write_gp_info
+    gpCount=0
+    loop while gpCount<=gpnum
+        buf(1) = ''
+        loop j (1,N_RECORD)
+        gpCount=gpCount+1
+		if gpCount<=gpnum
+            caseof  info_flag
+               case 0
+                    buf(1) = buf(1) + string(GP_COOR_(gpCount,1)) + ' '
+               case 1
+                    buf(1) = buf(1) + string(GP_COOR_(gpCount,2)) + ' '
+               case 2
+                    buf(1) = buf(1) + string(GP_COOR_(gpCount,3)) + ' '
+               case 3
+                    get_gp_disp
+                    buf(1) = buf(1) + string(gp_disp*disp_Scaler) + ' '
+               case 4
+                    buf(1) = buf(1) + string(GP_DISP_(gpCount,1)*disp_Scaler) + ' '
+               case 5
+                    buf(1) = buf(1) + string(GP_DISP_(gpCount,2)*disp_Scaler) + ' '
+               case 6
+                    buf(1) = buf(1) + string(GP_DISP_(gpCount,3)*disp_Scaler) + ' '
+			   case 7
+                    buf(1) = buf(1) + string(GP_VEL_(gpCount,1)*disp_Scaler) + ' '
+			   case 8
+                    buf(1) = buf(1) + string(GP_VEL_(gpCount,2)*disp_Scaler) + ' '
+			   case 9
+                    buf(1) = buf(1) + string(GP_VEL_(gpCount,3)*disp_Scaler) + ' '
+			   case 10
+			        get_gp_vel
+                    buf(1) = buf(1) + string(gp_velocity*disp_Scaler) + ' '
+            endcase
+        endif
+        endloop
+        status = write(buf,1)
+    endloop
+end
+
+;Write zone-related data,such as Stresses
+def write_zone_info
+    zCount=0
+    loop while zCount<=znum
+        buf(1) = ''
+        loop j (1,N_RECORD)
+        zCount=zCount+1
+		if zCount<=znum
+            caseof  info_flag
+               case 0
+                    buf(1) = buf(1) + string(ZONE_STRESS(zCount,1)*stress_Scaler) + ' '
+               case 1
+                    buf(1) = buf(1) + string(ZONE_STRESS(zCount,2)*stress_Scaler) + ' '
+               case 2
+                    buf(1) = buf(1) + string(ZONE_STRESS(zCount,3)*stress_Scaler) + ' '
+               case 4
+                    buf(1) = buf(1) + string(ZONE_STRESS(zCount,4)*stress_Scaler) + ' '
+               case 8
+                    buf(1) = buf(1) + string(ZONE_STRESS(zCount,5)*stress_Scaler) + ' '
+               case 16
+                    buf(1) = buf(1) + string(ZONE_STRESS(zCount,6)*stress_Scaler) + ' '
+               case 32
+                    buf(1) = buf(1) + string(ZONE_STRESS(zCount,7)*stress_Scaler) + ' '
+               case 64
+                    buf(1) = buf(1) + string(ZONE_STRESS(zCount,8)*stress_Scaler) + ' '
+               case 128
+                    buf(1) = buf(1) + string(ZONE_STRESS(zCount,9)*stress_Scaler) + ' '  
+               case 256
+                    buf(1) = buf(1) + string(ZONE_STRESS(zCount,10)*stress_Scaler) + ' '            						
+            endcase
+            endif
+        endloop
+        status = write(buf,1)
+    endloop
+end
+
+;Write Tecplot File Head
+def write_head
+  buf(1) = 'TITLE     = "3DEC5.2 TO Tecplot360 Modified By Shine@2021"'
+  buf(2) = 'VARIABLES = "X" "Y" "Z" "DISP" "XDISP"'
+  buf(2) = buf(2) + ' "YDISP" "ZDISP" "XVEL" "YVEL" "ZVEL" "VEL" "SXX" "SYY" "SZZ"' 
+  buf(2) = buf(2) + ' "SXY" "SXZ" "SYZ" "SIG1" "SIG2" "SIG3" "Mises"'
+  buf(3) = 'ZONE T= " '+ head_title+' "'
+  buf(4) = 'NODES=' + string(gpnum) + ','
+  buf(4) = buf(4) + ' ELEMENTS=' + string(zonenum) + ',' + ' ZONETYPE=FETETRAHEDRON, '
+  buf(5) = 'DATAPACKING=BLOCK '
+  buf(6) = 'VARLOCATION=([12-21]=CELLCENTERED)'
+  buf(7) = 'DT=(SINGLE SINGLE SINGLE SINGLE '
+  buf(7) = buf(7) + ' SINGLE SINGLE SINGLE SINGLE'
+  buf(7) = buf(7) + ' SINGLE SINGLE SINGLE SINGLE'
+  buf(7) = buf(7) + ' SINGLE SINGLE SINGLE SINGLE)'
+  status = write(buf,7)
+end
+
+
+;; Write Zone Connectivity
+def write_zone_connect    
+    loop N (1,znum)
+        buf(1) =string(Z_GP_INDEX(N,1))+' '+string(Z_GP_INDEX(N,2)) 
+        buf(1)=buf(1)+' '+string(Z_GP_INDEX(N,3))  
+        buf(1)=buf(1)+' '+string(Z_GP_INDEX(N,4))    			
+        status=write(buf,1)             
+    endloop
+end
+
+
+;; Main Function
+def main
+    status = close
+    status = open(tec_file,IO_WRITE,IO_ASCII)
+    if status = 0 then
+        ii=out("Printing header...please wait")
+        write_head
+        ii=out("--Finished printing header!\n")
+        ;Write gp-related data Coordinates
+        info_flag = 0
+        ii=out("Printing x coordinate...please wait")
+        write_gp_info
+        ii=out("--Finished printing x coordinate!\n")
+   
+        info_flag = 1
+        ii=out("Printing y coordinate...please wait")
+        write_gp_info
+        ii=out("--Finished printing y coordinate!\n")
+
+        info_flag = 2
+        ii=out("Printing z coordinate...please wait")
+        write_gp_info
+        ii=out("--Finished printing z coordinate!\n")
+        ;Write gp-related data displacement
+        info_flag = 3
+        ii=out("Printing displacement magnitude...please wait")
+        write_gp_info
+        ii=out("--Finished printing displacement magnitude!\n")
+  
+        info_flag = 4
+        ii=out("Printing x displacement...please wait")
+        write_gp_info
+        ii=out("--Finished printing x displacement!\n")
+ 
+        info_flag = 5
+        ii=out("Printing y displacement...please wait")
+        write_gp_info
+        ii=out("--Finished printing y displacement!\n")
+  
+        info_flag = 6
+        ii=out("Printing z displacement...please wait")
+        write_gp_info
+        ii=out("--Finished printing z displacement!\n")
+        
+        info_flag = 7
+        ii=out("Printing x velocity...please wait")
+        write_gp_info
+        ii=out("--Finished printing x velocity!\n")
+        
+        info_flag = 8
+        ii=out("Printing y velocity...please wait")
+        write_gp_info
+        ii=out("--Finished printing y velocity!\n")
+        
+        info_flag = 9
+        ii=out("Printing z velocity...please wait")
+        write_gp_info
+        ii=out("--Finished printing z velocity!\n")
+        
+        info_flag = 10
+        ii=out("Printing velocity magnitude...please wait")
+        write_gp_info
+        ii=out("--Finished printing velocity magnitude!\n")
+        ;Write zone-related data stress 
+        ii=out("Printing zone stress component...please wait")  
+        info_flag = 0
+        write_zone_info
+        info_flag = 1
+        write_zone_info
+        info_flag = 2
+        write_zone_info
+        info_flag = 4
+        write_zone_info
+        info_flag = 8
+        write_zone_info
+        info_flag = 16
+        write_zone_info    
+        info_flag = 32
+        write_zone_info
+        info_flag = 64
+        write_zone_info
+        info_flag = 128
+        write_zone_info
+        info_flag = 256
+        write_zone_info
+        ii=out("--Finished printing zone stress component!\n")
+        ;Write zone Structure  
+        ii=out("Printing zone gp connection...please wait")  
+        write_zone_connect
+        ii=out("--Finished printing zone gp connection!\n")
+        
+        status = close
+        ii = out('Successfully Write GP & Zone Data Into Tecplot360 Format File: '+ tec_file)
+    else
+        ii=out('Open File Error! Status = ' + string(status))			
+    endif			
+end
+@main
+

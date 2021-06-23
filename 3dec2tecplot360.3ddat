@@ -58,7 +58,7 @@ def ini_fileout
     IO_FISH  = 0
     IO_ASCII = 1
     N_RECORD=10
-	;Set unit scaling factor
+    ;Set unit scaling factor
     disp_Scaler= 1    ;eg. unit m/mm
     stress_Scaler = 1 ;eg. unit Pa/MPa
     array buf(10)
@@ -153,10 +153,10 @@ def get_Stress
     ;The array is used to store zone node number in order
     array Z_GP_INDEX(zonenum,4)
 	
-	;The array is used to store zone stress component
-	;including sxx,syy,szz,sxy,sxz,syz,sig1,sig2,sig3,Mises
-	;you can change the size of this array and add 
-	;more stress component
+    ;The array is used to store zone stress component
+    ;including sxx,syy,szz,sxy,sxz,syz,sig1,sig2,sig3,Mises
+    ;you can change the size of this array and add 
+    ;more stress component
     array ZONE_STRESS(zonenum,10)
     znum=0
     n_block=0
@@ -319,7 +319,7 @@ def write_head
 end
 
 
-;; Write Zone Connectivity
+;Write Zone Connectivity
 def write_zone_connect    
     loop N (1,znum)
         buf(1) =string(Z_GP_INDEX(N,1))+' '+string(Z_GP_INDEX(N,2)) 
@@ -330,7 +330,7 @@ def write_zone_connect
 end
 
 
-;; Main Function
+;Main Function
 def main
     status = close
     status = open(tec_file,IO_WRITE,IO_ASCII)

@@ -80,8 +80,8 @@ define get_zonenum
     bi=b_next(bi)
     bnum=bnum+1
     endloop
-    oo=out("Total zone: "+string(zonenum))
-    oo=out("Total block: "+string(bnum))
+    oo=out("Total number of zones : "+string(zonenum))
+    oo=out("Total number of blocks: "+string(bnum))
 end
 @get_zonenum 
 
@@ -96,7 +96,7 @@ define get_gpnum
         endloop
       bi=b_next(bi)
     endloop
-    oo=out("Total gp: "+string(gpnum))
+    oo=out("Total number of gps   : "+string(gpnum))
 end
 @get_gpnum
 

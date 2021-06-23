@@ -35,7 +35,7 @@
 ;                  of all printed information
 ; Usage: When the model calculation is completed, call this script to 
 ;        output the model information to Tecplot360 for post-processing.
-;        use command:call your_path/3DEC520_Tecplot.dat       
+;        use command:call your_path/3dec2tecplot360.3ddat   
 ;         __    _          
 ;   _____/ /_  (_)___  ___ 
 ;  / ___/ __ \/ / __ \/ _ \
